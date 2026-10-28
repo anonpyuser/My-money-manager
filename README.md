@@ -1,2 +1,2 @@
-# My-money-manager
+# my-money-manager
 Money managing
