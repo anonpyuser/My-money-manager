@@ -1,0 +1,1 @@
+{"name":"My Money Manager","short_name":"My Money","description":"Private weekly paycheck and bill due-date planner","start_url":"./index.html","scope":"./","display":"standalone","background_color":"#0a1120","theme_color":"#101a2b","icons":[{"src":"icon.svg","sizes":"any","type":"image/svg+xml","purpose":"any maskable"}]}
