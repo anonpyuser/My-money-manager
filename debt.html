@@ -67,6 +67,7 @@ function persist(){try{localStorage.setItem(KEY,JSON.stringify(state));return tr
 function active(){return state.debts.filter(d=>d.includeInPlan!==false&&Number(d.balance)>0)}
 function openDebtAt(i){const item=state.debts[i];if(item)openDebt(item.id)}
 function removeDebtAt(i){const item=state.debts[i];if(item)removeDebt(item.id)}
+function markPaidAt(i){const item=state.debts[i];if(!item||Number(item.balance)<=0)return;if(!confirm('Mark '+item.name+' as paid in full? This sets balance and minimum to $0, and excludes it from future payoff projections.'))return;item.balance=0;item.min=0;item.includeInPlan=false;item.paidOff=true;item.paidDate=new Date().toISOString().slice(0,10);if(persist())draw()}
 function openDebt(id){const d=state.debts.find(x=>x.id===id);el('debt-modal-title').textContent=d?'Edit account':'Add account';el('debt-id').value=d?.id||'';
 for(const [k,p] of Object.entries({'debt-name':'name','debt-balance':'balance','debt-apr':'apr','debt-min':'min','debt-limit':'limit'})){el(k).value=d?.[p]??''}el('debt-status').value=d?.status||'open';el('debt-include').checked=d?.includeInPlan!==false;el('debt-modal').showModal()}
 function saveDebt(ev){ev.preventDefault();const name=el('debt-name').value.trim(),balance=numVal('debt-balance'),apr=numVal('debt-apr'),min=numVal('debt-min'),limit=numVal('debt-limit');
@@ -81,16 +82,20 @@ const f=ev.target.files?.[0];if(!f)return;
 try{
  const o=JSON.parse(await f.text());
  if(o.kind!=='debt-snapshot'||!Array.isArray(o.debts)||o.debts.length>200)throw Error('Not a supported debt-only import');
- const seen=new Set(state.debts.map(d=>String(d.name).toLowerCase().replace(/[^a-z0-9]/g,'')));let added=0,skipped=0;
+ if(o.updatePaidOff===true&&!confirm('Apply this private import? Accounts marked paid off will be updated to $0. All other existing debts and bills remain unchanged.'))return;
+ const seen=new Set(state.debts.map(d=>String(d.name).toLowerCase().replace(/[^a-z0-9]/g,'')));let added=0,updated=0,skipped=0;
  for(const x of o.debts){
   const name=typeof x.name==='string'?x.name.trim():'',bal=Number(x.balance),min=Number(x.min);
   const apr=x.apr===null||x.apr===''||x.apr===undefined?null:Number(x.apr);
   const limit=x.limit===null||x.limit===''||x.limit===undefined?null:Number(x.limit);
   const key=name.toLowerCase().replace(/[^a-z0-9]/g,'');
-  if(!key||seen.has(key)||!Number.isFinite(bal)||bal<0||!Number.isFinite(min)||min<0||(apr!==null&&(!Number.isFinite(apr)||apr<0||apr>100))||(limit!==null&&(!Number.isFinite(limit)||limit<0))){skipped++;continue}
-  state.debts.push({id:'di-'+Date.now()+'-'+added+'-'+Math.random().toString(36).slice(2,6),name:name.slice(0,90),balance:cents(bal),apr,min:cents(min),limit:limit===null?null:cents(limit),status:['open','needs-review','charged-off'].includes(x.status)?x.status:'needs-review',includeInPlan:x.includeInPlan===true,asOf:typeof x.asOf==='string'?x.asOf:'',note:typeof x.note==='string'?x.note.slice(0,600):''});seen.add(key);added++;
+  if(!key||!Number.isFinite(bal)||bal<0||!Number.isFinite(min)||min<0||(apr!==null&&(!Number.isFinite(apr)||apr<0||apr>100))||(limit!==null&&(!Number.isFinite(limit)||limit<0))){skipped++;continue}
+  const existing=state.debts.find(d=>String(d.name).toLowerCase().replace(/[^a-z0-9]/g,'')===key);
+  if(existing){if(o.updatePaidOff===true&&x.paidOff===true&&bal===0){existing.balance=0;existing.min=0;existing.includeInPlan=false;existing.paidOff=true;existing.paidDate=typeof x.paidDate==='string'?x.paidDate:'';existing.asOf=typeof x.asOf==='string'?x.asOf:existing.asOf;updated++;}else{skipped++;}continue;}
+  if(seen.has(key)){skipped++;continue;}
+  state.debts.push({id:'di-'+Date.now()+'-'+added+'-'+Math.random().toString(36).slice(2,6),name:name.slice(0,90),balance:cents(bal),apr,min:cents(min),limit:limit===null?null:cents(limit),status:['open','needs-review','charged-off'].includes(x.status)?x.status:'needs-review',includeInPlan:x.includeInPlan===true,asOf:typeof x.asOf==='string'?x.asOf:'',note:typeof x.note==='string'?x.note.slice(0,600):'',paidOff:x.paidOff===true&&bal===0,paidDate:x.paidOff===true&&bal===0?x.paidDate||'':null});seen.add(key);added++;
  }
- if(persist()){draw();alert('Added '+added+' debt records; skipped '+skipped+' existing/invalid entries. Check historical balances and minimums before using estimates.')}
+ if(persist()){draw();alert('Added '+added+' debt records, updated '+updated+' paid-off balances, skipped '+skipped+' unchanged/invalid entries. Review your Bills tab separately to remove obsolete minimum-payment reminders.')}
 }catch(e){alert('Import failed: '+e.message)}finally{ev.target.value=''}
 }
 
@@ -147,7 +152,7 @@ function renderScores(){const list=state.creditScores.slice().sort((a,b)=>b.date
 function draw(refreshExtra=true){
 const list=state.debts,activeCards=active(),total=list.reduce((n,x)=>n+Number(x.balance),0),min=activeCards.reduce((n,x)=>n+Number(x.min),0),known=activeCards.filter(x=>x.apr!==null&&x.apr!==undefined&&x.apr!==''&&Number.isFinite(Number(x.apr))),interest=known.reduce((n,x)=>n+monthInterest(x),0),unknown=activeCards.length-known.length;
 el('debt-kpis').innerHTML='<div class="card"><div class="eyebrow">Entered balances</div><div class="figure">'+money(total)+'</div></div><div class="card"><div class="eyebrow">Monthly minimums</div><div class="figure">'+money(min)+'</div></div><div class="card"><div class="eyebrow">Interest / month</div><div class="figure">'+money(interest)+'</div><div class="tiny muted">'+(unknown?'Partial: '+unknown+' APR unknown':'Approximate, before payments')+'</div></div><div class="card"><div class="eyebrow">Tracked accounts</div><div class="figure">'+list.length+'</div></div>';
-el('debt-list').innerHTML=list.length?list.map((x,i)=>'<div class="lineitem"><div class="row"><div><strong>'+safe(x.name)+'</strong><div class="small muted">'+money(x.balance)+' balance · '+(x.apr===null||x.apr===undefined||x.apr===''?'APR unknown':fmt(x.apr)+'% APR')+'</div><div class="hint">Minimum '+money(x.min)+'/mo'+(x.limit!==null&&x.limit!==undefined?' · Limit '+money(x.limit):'')+'</div><div class="hint">'+(x.includeInPlan===false?'Excluded from repayment projection':'Included in repayment projection')+(x.status==='charged-off'?' · Charged off':x.status==='needs-review'?' · Needs review':'')+(x.asOf?' · Source date '+safe(x.asOf):'')+'</div>'+(x.note?'<div class="hint">'+safe(x.note)+'</div>':'')+'</div><div style="display:flex;gap:6px"><button class="btn sm" onclick="openDebtAt('+i+')">Edit</button><button class="btn sm danger" onclick="removeDebtAt('+i+')">×</button></div></div></div>').join(''):'<div class="hint" style="padding:18px 0">No credit cards added yet. Add the balances, APRs, and minimum payments you want to track.</div>';
+el('debt-list').innerHTML=list.length?list.map((x,i)=>'<div class="lineitem"><div class="row"><div><strong>'+safe(x.name)+'</strong><div class="small muted">'+money(x.balance)+' balance · '+(x.apr===null||x.apr===undefined||x.apr===''?'APR unknown':fmt(x.apr)+'% APR')+'</div><div class="hint">Minimum '+money(x.min)+'/mo'+(x.limit!==null&&x.limit!==undefined?' · Limit '+money(x.limit):'')+'</div><div class="hint">'+(x.paidOff===true?'Paid in full · ':'')+(x.includeInPlan===false?'Excluded from repayment projection':'Included in repayment projection')+(x.status==='charged-off'?' · Charged off':x.status==='needs-review'?' · Needs review':'')+(x.asOf?' · Source date '+safe(x.asOf):'')+'</div>'+(x.note?'<div class="hint">'+safe(x.note)+'</div>':'')+'</div><div style="display:flex;gap:6px"><button class="btn sm" onclick="openDebtAt('+i+')">Edit</button><button class="btn sm" style="display:'+(Number(x.balance)>0?'':'none')+'" onclick="markPaidAt('+i+')">Paid $0</button><button class="btn sm danger" onclick="removeDebtAt('+i+')">×</button></div></div></div>').join(''):'<div class="hint" style="padding:18px 0">No credit cards added yet. Add the balances, APRs, and minimum payments you want to track.</div>';
 if(refreshExtra)el('extra').value=state.debtPrefs.extraMonthly||0;
 renderPlans();renderImpact();renderUtil();renderScores();
 }
