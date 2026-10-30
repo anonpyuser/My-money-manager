@@ -1,0 +1,123 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#101a2b"><title>Debt Planner · My Money Manager</title>
+<style>
+:root{color-scheme:dark;--bg:#0a1120;--card:#152137;--line:#2b3a50;--text:#f1f5fa;--dim:#a5b3c8;--mint:#65d8b3;--yellow:#f6c979;--red:#fa8e92}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--text);font:15px/1.45 -apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;padding:20px 16px calc(105px + env(safe-area-inset-bottom))}
+main{max-width:850px;margin:auto}h1{font-size:24px;margin:3px 0 14px;letter-spacing:-.02em}h2{font-size:17px;margin:0 0 12px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:17px;padding:17px;margin-bottom:13px}
+.hero{background:linear-gradient(120deg,#19394a,#173328 75%)}.muted{color:var(--dim)}.tiny{font-size:11px}.small{font-size:12px}.eyebrow{text-transform:uppercase;letter-spacing:.12em;font-size:11px;color:var(--dim);font-weight:700}
+.kpis{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}.kpis .card{margin:0}.figure{font-size:23px;font-weight:800;letter-spacing:-.035em;margin-top:5px;overflow-wrap:anywhere}
+.row{display:flex;justify-content:space-between;gap:12px;align-items:center}.split{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+hr{border:0;border-top:1px solid var(--line);margin:13px 0}.lineitem{border-bottom:1px solid var(--line);padding:13px 0}.lineitem:last-child{border:0}.btn{border:1px solid #3b536e;background:#24364d;color:var(--text);padding:10px 13px;border-radius:10px;font:inherit;font-weight:650;cursor:pointer}.btn.primary{background:var(--mint);border-color:var(--mint);color:#112321}.btn.sm{font-size:12px;padding:7px 9px}.btn.danger{border-color:#77434c;color:var(--red);background:#442530}
+input{width:100%;border-radius:10px;border:1px solid #344963;background:#0f192b;color:var(--text);font:inherit;padding:12px}label{display:block;color:#ccd7e6;font-size:12px;font-weight:700;margin:10px 0 6px}.hint{color:var(--dim);font-size:12px}.warn{border:1px solid #695b3b;background:#2d302c;color:#ffdfaa;border-radius:10px;padding:12px;margin:12px 0;font-size:12px}
+.good{color:var(--mint)}.bad{color:var(--red)}.tag{display:inline-block;font-size:10px;border-radius:7px;padding:3px 7px;background:#283952;color:#b1c8e9;font-weight:700}
+nav{display:flex;position:fixed;bottom:0;left:0;right:0;justify-content:space-around;padding:10px 5px calc(10px + env(safe-area-inset-bottom));background:#111d30fa;border-top:1px solid var(--line);z-index:3}
+nav a{color:var(--dim);text-decoration:none;text-align:center;min-width:46px;font-size:10px;display:grid;gap:2px}nav b{font-size:19px}nav a.active{color:var(--mint)}
+dialog{width:min(94vw,530px);background:var(--card);color:var(--text);border:1px solid var(--line);border-radius:17px;padding:18px;max-height:90vh;overflow:auto}
+dialog::backdrop{background:#000a}.actions{display:flex;gap:8px;justify-content:flex-end;flex-wrap:wrap;margin-top:15px}.bar{height:9px;border-radius:9px;background:#37455a;overflow:hidden;margin:12px 0}.bar>div{height:100%;background:var(--mint);width:0}
+@media(min-width:650px){body{padding:28px 26px 110px}.kpis{grid-template-columns:repeat(4,minmax(0,1fr))}nav{max-width:850px;left:50%;transform:translateX(-50%);border:1px solid var(--line);border-radius:16px 16px 0 0}}
+</style></head>
+<body><main>
+<header><div class="eyebrow">My Money Manager · Private on your device</div><h1>Debt Payoff & Credit Health</h1></header>
+<div class="card hero"><h2>Plan with your real monthly budget</h2><div class="small muted">Compare payoff methods, see estimated interest, and track your credit habits. No card data is published to GitHub. This page does not connect to banks or credit bureaus directly.</div></div>
+<section class="kpis" id="debt-kpis" aria-live="polite"></section>
+<div class="card" style="margin-top:13px"><div class="row"><h2>My credit cards & debts</h2><button class="btn primary sm" onclick="openDebt()">+ Add card</button></div>
+<div class="hint">Enter each account's current balance, purchase APR, and monthly minimum from the latest statement. Use 0% only for a genuine 0% offer. For cash advances or multiple APRs, a single APR is only an approximation.</div><div id="debt-list"></div></div>
+<div class="card"><h2>Compare repayment strategies</h2>
+<label for="extra">Extra monthly payment beyond all listed minimums ($)</label><input id="extra" type="number" min="0" max="100000" step=".01" inputmode="decimal" placeholder="0" oninput="extraInput()">
+<div class="hint" style="margin-top:7px">Only enter money you can allocate after essentials and other bills. This amount is a scenario, not a recommendation. Paid-off minimums are rolled into remaining debts in both scenarios.</div>
+<div id="plans" style="margin-top:16px"></div></div>
+<div class="card"><h2>Credit utilization</h2><div id="utilization"></div>
+<p class="hint">Utilization is based on the card balances and limits you enter, not your complete credit report. Lower reported balances may help your credit profile, but there is no guaranteed score change or exact score target.</p></div>
+<div class="card"><h2>Track your credit score</h2><div class="hint">Record the score and model shown by your provider. Your app does not retrieve credit reports or forecast score points.</div>
+<div class="split"><div><label for="score-date">Report date</label><input id="score-date" type="date"></div><div><label for="score-number">Score (300–850)</label><input id="score-number" type="number" min="300" max="850" step="1" inputmode="numeric" placeholder="e.g. 600"></div></div>
+<label for="score-source">Score model / source</label><input id="score-source" maxlength="60" placeholder="e.g. Experian VantageScore 3.0">
+<div class="actions"><button class="btn primary" onclick="addScore()">Save score check-in</button></div><div id="score-history"></div></div>
+<div class="card"><h2>Habits that help</h2>
+<div class="lineitem"><strong>1. Avoid missing due dates.</strong><div class="hint">Use autopay for at least minimums where feasible and keep reminders enabled. A payment history is important for credit health.</div></div>
+<div class="lineitem"><strong>2. Reduce revolving balances.</strong><div class="hint">Payments can lower utilization when lenders report new balances. Other report factors may still affect your score.</div></div>
+<div class="lineitem"><strong>3. Compare costs, not promised score gains.</strong><div class="hint">Avalanche typically minimizes interest when rates are known; snowball prioritizes smaller balances for momentum. Neither strategy guarantees a particular credit score.</div></div>
+<div class="lineitem"><strong>4. Handle overdue and charged-off accounts separately.</strong><div class="hint">Confirm account status and who owns the debt before making a plan. Paying a charged-off debt may not erase prior late-payment reporting. Avoid assuming it will.</div></div>
+<div class="lineitem"><strong>5. Keep the numbers accurate.</strong><div class="hint">Statements, fees, daily interest, promotions, new purchases, late charges, and different APR tiers can change the real payoff schedule.</div></div></div>
+<div class="card"><div class="row"><h2>Your data stays local</h2><button class="btn sm" onclick="location.href='./index.html'">Back to budget</button></div>
+<div class="hint">Debt entries and score notes use the same browser storage as your money manager, so an app backup includes them. They are not uploaded to GitHub. Use Settings → Export backup regularly. The bill planner does NOT automatically add debt minimums from this page: if you also have matching bill entries, do not double-count payments.</div></div>
+</main>
+<dialog id="debt-modal"><form onsubmit="saveDebt(event)"><h2 id="debt-modal-title">Add a card</h2><input id="debt-id" type="hidden">
+<label for="debt-name">Card or debt name</label><input id="debt-name" maxlength="90" required placeholder="e.g. Visa">
+<div class="split"><div><label for="debt-balance">Current balance ($)</label><input id="debt-balance" type="number" min="0" step=".01" required></div><div><label for="debt-apr">APR (%) — leave blank if unknown</label><input id="debt-apr" type="number" min="0" max="100" step=".01" placeholder="Unknown"></div></div>
+<div class="split"><div><label for="debt-min">Monthly minimum ($)</label><input id="debt-min" type="number" min="0" step=".01" required></div><div><label for="debt-limit">Credit limit ($), if any</label><input id="debt-limit" type="number" min="0" step=".01" placeholder="Optional"></div></div>
+<div class="hint">Use the purchase APR for one-rate estimates. Real interest often accrues daily. Check your statement for exact charges and any cash-advance APR.</div>
+<div class="actions"><button type="button" class="btn" onclick="document.getElementById('debt-modal').close()">Cancel</button><button class="btn primary" type="submit">Save account</button></div></form></dialog>
+<nav aria-label="Main navigation"><a href="./index.html"><b>⌂</b>Home</a><a href="./index.html" onclick="sessionStorage.setItem('mmm_next','bills')"><b>▤</b>Bills</a><a href="./index.html" onclick="sessionStorage.setItem('mmm_next','forecast')"><b>▥</b>Pay</a><a href="./debt.html" class="active"><b>◇</b>Debt</a><a href="./index.html" onclick="sessionStorage.setItem('mmm_next','settings')"><b>⚙</b>Settings</a></nav>
+<script>
+'use strict';
+const KEY='my-money-manager-v3';
+let state;
+try{state=JSON.parse(localStorage.getItem(KEY)||'null')}catch(e){}
+if(!state||typeof state!=='object'||!Array.isArray(state.bills))state={version:3,settings:{pay:0,payDate:'',essentials:0,saving:0},bills:[],incomes:[],expenses:[],paid:{}};
+if(!Array.isArray(state.debts))state.debts=[];
+if(!Array.isArray(state.creditScores))state.creditScores=[];
+if(!state.debtPrefs||typeof state.debtPrefs!=='object')state.debtPrefs={extraMonthly:0};
+const el=id=>document.getElementById(id), money=n=>new Intl.NumberFormat('en-US',{style:'currency',currency:'USD'}).format(n), fmt=n=>Number(n).toLocaleString('en-US',{maximumFractionDigits:1});
+const safe=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const cents=n=>Math.round((Number(n)||0)*100)/100;
+const numVal=id=>{let v=el(id).value.trim();return v===''?null:Number(v)};
+function persist(){try{localStorage.setItem(KEY,JSON.stringify(state));return true}catch(e){alert('Could not save to this browser. Check storage permissions.');return false}}
+function active(){return state.debts.filter(d=>Number(d.balance)>0)}
+function openDebt(id){const d=state.debts.find(x=>x.id===id);el('debt-modal-title').textContent=d?'Edit account':'Add account';el('debt-id').value=d?.id||'';
+for(const [k,p] of Object.entries({'debt-name':'name','debt-balance':'balance','debt-apr':'apr','debt-min':'min','debt-limit':'limit'})){el(k).value=d?.[p]??''}el('debt-modal').showModal()}
+function saveDebt(ev){ev.preventDefault();const name=el('debt-name').value.trim(),balance=numVal('debt-balance'),apr=numVal('debt-apr'),min=numVal('debt-min'),limit=numVal('debt-limit');
+if(!name||balance===null||!Number.isFinite(balance)||balance<0||min===null||!Number.isFinite(min)||min<0||(apr!==null&&(!Number.isFinite(apr)||apr<0||apr>100))||(limit!==null&&(!Number.isFinite(limit)||limit<0)))return alert('Enter valid amounts, a name, and an APR from 0 to 100% (or leave APR blank).');
+const id=el('debt-id').value||('d'+Date.now()+Math.random().toString(36).slice(2,6));
+const obj={id,name,balance:cents(balance),apr,min:cents(min),limit:limit===null?null:cents(limit)};
+state.debts=state.debts.filter(x=>x.id!==id).concat(obj);if(persist()){el('debt-modal').close();draw()}}
+function removeDebt(id){if(!confirm('Remove this debt from the payoff planner? This will not change your bill reminders.'))return;state.debts=state.debts.filter(x=>x.id!==id);if(persist())draw()}
+function extraInput(){let n=numVal('extra');if(n===null||!Number.isFinite(n)||n<0||n>100000)return;state.debtPrefs.extraMonthly=cents(n);if(persist())draw(false)}
+function monthInterest(d){return Number(d.balance)*(Number(d.apr)/1200)}
+function runPlan(method,extra){
+const cards=active().map(d=>({id:d.id,name:d.name,balance:cents(d.balance),apr:Number(d.apr),min:cents(d.min)}));
+const base=cards.reduce((n,d)=>n+d.min,0),budget=base+extra;
+let interest=0,paid=0,months=0;
+if(cards.length===0||!(budget>0))return null;
+for(months=1;months<=600;months++){
+let outstanding=cards.filter(c=>c.balance>0.005);if(!outstanding.length)break;
+for(const c of outstanding){const int=c.balance*c.apr/1200;c.balance+=int;interest+=int}
+let remaining=budget;
+for(const c of outstanding){const p=Math.min(c.balance,c.min,remaining);c.balance-=p;remaining-=p;paid+=p}
+let safeGuard=0;
+while(remaining>0.005&&cards.some(c=>c.balance>0.005)&&safeGuard++<cards.length+2){
+let sorted=cards.filter(c=>c.balance>0.005).sort((a,b)=>method==='avalanche'?(b.apr-a.apr||a.balance-b.balance):(a.balance-b.balance||b.apr-a.apr));
+let c=sorted[0],p=Math.min(remaining,c.balance);if(p<=0)break;c.balance-=p;remaining-=p;paid+=p}
+if(cards.every(c=>c.balance<0.01))return {months,interest:cents(interest),total:cents(paid),monthly:cents(budget)}
+}
+return {months:null,interest:null,total:null,monthly:cents(budget)};
+}
+function mLabel(n){if(n===null)return 'Not paid within 50 years';let years=Math.floor(n/12),months=n%12;return years?(years+' yr'+(years!==1?'s':'')+(months?' '+months+' mo':'')):(n+' mo')}
+function renderPlans(){const cards=active(),unknown=cards.filter(d=>d.apr===null||d.apr===undefined||d.apr===''||!Number.isFinite(Number(d.apr))),extra=Number(state.debtPrefs.extraMonthly)||0;
+el('extra').value=extra;
+if(!cards.length){el('plans').innerHTML='<div class="hint">Add your cards above to compare interest and payoff strategies.</div>';return}
+if(unknown.length){el('plans').innerHTML='<div class="warn">Enter the APR for every active account before running a payoff comparison. Missing APR is not treated as 0%.</div>';return}
+const a=runPlan('avalanche',extra),b=runPlan('snowball',extra);
+if(!a||!b){el('plans').innerHTML='<div class="warn">Add a positive monthly payment budget to calculate a payoff plan.</div>';return}
+const card=(title,sub,res)=>'<div class="card" style="margin:0"><div class="eyebrow">'+title+'</div><div class="hint">'+sub+'</div><div class="figure">'+mLabel(res.months)+'</div><div class="small muted">Estimated interest: '+(res.interest===null?'Cannot project':money(res.interest))+'</div><div class="small muted">Monthly total including minimums: '+money(res.monthly)+'</div></div>';
+el('plans').innerHTML='<div class="split">'+card('Avalanche','Highest APR first',a)+card('Snowball','Smallest balance first',b)+'</div>'+(a.interest!==null&&b.interest!==null?'<div class="hint" style="margin-top:10px">Modeled interest difference: '+money(Math.abs(a.interest-b.interest))+'. With these assumptions, '+(a.interest<b.interest?'avalanche costs less interest':b.interest<a.interest?'snowball costs less interest':'both cost about the same')+'.</div>':'<div class="warn">At this payment budget, at least one plan does not pay off within 50 years. Check whether monthly payments cover accruing interest.</div>')+'<p class="hint">Illustration only. Approximate monthly accrual = balance × APR / 12, constant APRs, no new charges/fees and the same monthly payment total. Real statements use daily interest and may differ. Minimum payment rules also change over time. Results are not credit-score forecasts.</p>';
+}
+function renderUtil(){const listed=active(),known=listed.filter(d=>d.limit!==null&&Number(d.limit)>0),bal=known.reduce((n,d)=>n+Number(d.balance),0),lim=known.reduce((n,d)=>n+Number(d.limit),0);
+if(!known.length){el('utilization').innerHTML='<div class="hint">Enter credit limits to see utilization on the cards you track.</div>';return}
+const pct=100*bal/lim,partial=known.length!==listed.length;el('utilization').innerHTML='<div class="row"><strong>'+fmt(pct)+'% of entered limits used</strong><span class="tag">'+known.length+' / '+listed.length+' cards</span></div><div class="bar"><div style="width:'+Math.min(100,pct)+'%"></div></div><div class="small muted">Entered balance '+money(bal)+' of '+money(lim)+' in limits.</div>'+(partial?'<div class="warn">Partial result: some active accounts have no credit limit entered.</div>':'')+(pct>100?'<div class="warn">Some balances exceed their listed limits. Verify the amounts and account types.</div>':'');
+}
+function addScore(){const date=el('score-date').value,score=numVal('score-number'),source=el('score-source').value.trim();if(!date||!Number.isInteger(score)||score<300||score>850||!source)return alert('Enter a date, score 300–850, and score model/source.');
+state.creditScores=state.creditScores.filter(x=>!(x.date===date&&x.source===source)).concat({date,score,source});if(persist()){el('score-number').value='';draw()}}
+function removeScore(date,source){if(!confirm('Remove this score check-in?'))return;state.creditScores=state.creditScores.filter(x=>!(x.date===date&&x.source===source));if(persist())draw()}
+function renderScores(){const list=state.creditScores.slice().sort((a,b)=>b.date.localeCompare(a.date));el('score-history').innerHTML=!list.length?'<div class="hint" style="margin-top:12px">No score check-ins saved yet.</div>':list.slice(0,18).map(x=>'<div class="lineitem row"><div><strong>'+safe(x.score)+'</strong> <span class="hint">'+safe(x.source)+'</span><div class="hint">'+safe(x.date)+'</div></div><button class="btn sm danger" onclick="removeScore('+JSON.stringify(x.date)+','+JSON.stringify(x.source).replace(/"/g,'&quot;')+')">Delete</button></div>').join('')}
+function draw(refreshExtra=true){
+const list=state.debts,activeCards=active(),total=activeCards.reduce((n,x)=>n+Number(x.balance),0),min=activeCards.reduce((n,x)=>n+Number(x.min),0),known=activeCards.filter(x=>x.apr!==null&&x.apr!==undefined&&x.apr!==''&&Number.isFinite(Number(x.apr))),interest=known.reduce((n,x)=>n+monthInterest(x),0),unknown=activeCards.length-known.length;
+el('debt-kpis').innerHTML='<div class="card"><div class="eyebrow">Entered balances</div><div class="figure">'+money(total)+'</div></div><div class="card"><div class="eyebrow">Monthly minimums</div><div class="figure">'+money(min)+'</div></div><div class="card"><div class="eyebrow">Interest / month</div><div class="figure">'+money(interest)+'</div><div class="tiny muted">'+(unknown?'Partial: '+unknown+' APR unknown':'Approximate, before payments')+'</div></div><div class="card"><div class="eyebrow">Tracked accounts</div><div class="figure">'+list.length+'</div></div>';
+el('debt-list').innerHTML=list.length?list.map(x=>'<div class="lineitem"><div class="row"><div><strong>'+safe(x.name)+'</strong><div class="small muted">'+money(x.balance)+' balance · '+(x.apr===null||x.apr===undefined||x.apr===''?'APR unknown':fmt(x.apr)+'% APR')+'</div><div class="hint">Minimum '+money(x.min)+'/mo'+(x.limit!==null&&x.limit!==undefined?' · Limit '+money(x.limit):'')+'</div></div><div style="display:flex;gap:6px"><button class="btn sm" onclick="openDebt('+JSON.stringify(x.id)+')">Edit</button><button class="btn sm danger" onclick="removeDebt('+JSON.stringify(x.id)+')">×</button></div></div></div>').join(''):'<div class="hint" style="padding:18px 0">No credit cards added yet. Add the balances, APRs, and minimum payments you want to track.</div>';
+if(refreshExtra)el('extra').value=state.debtPrefs.extraMonthly||0;
+renderPlans();renderUtil();renderScores();
+}
+el('score-date').value=new Date().toISOString().slice(0,10);draw();
+</script>
+</body></html>
