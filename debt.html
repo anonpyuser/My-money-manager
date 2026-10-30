@@ -27,7 +27,7 @@ dialog::backdrop{background:#000a}.actions{display:flex;gap:8px;justify-content:
 <div class="card"><h2>Compare repayment strategies</h2>
 <label for="extra">Extra monthly payment beyond all listed minimums ($)</label><input id="extra" type="number" min="0" max="100000" step=".01" inputmode="decimal" placeholder="0" oninput="extraInput()">
 <div class="hint" style="margin-top:7px">Only enter money you can allocate after essentials and other bills. This amount is a scenario, not a recommendation. Paid-off minimums are rolled into remaining debts in both scenarios.</div>
-<div id="plans" style="margin-top:16px"></div></div>
+<div id="plans" style="margin-top:16px"></div><div id="debt-paycheck-impact"></div></div>
 <div class="card"><h2>Credit utilization</h2><div id="utilization"></div>
 <p class="hint">Utilization is based on the card balances and limits you enter, not your complete credit report. Lower reported balances may help your credit profile, but there is no guaranteed score change or exact score target.</p></div>
 <div class="card"><h2>Track your credit score</h2><div class="hint">Record the score and model shown by your provider. Your app does not retrieve credit reports or forecast score points.</div>
@@ -109,6 +109,17 @@ function renderUtil(){const listed=active(),known=listed.filter(d=>d.limit!==nul
 if(!known.length){el('utilization').innerHTML='<div class="hint">Enter credit limits to see utilization on the cards you track.</div>';return}
 const pct=100*bal/lim,partial=known.length!==listed.length;el('utilization').innerHTML='<div class="row"><strong>'+fmt(pct)+'% of entered limits used</strong><span class="tag">'+known.length+' / '+listed.length+' cards</span></div><div class="bar"><div style="width:'+Math.min(100,pct)+'%"></div></div><div class="small muted">Entered balance '+money(bal)+' of '+money(lim)+' in limits.</div>'+(partial?'<div class="warn">Partial result: some active accounts have no credit limit entered.</div>':'')+(pct>100?'<div class="warn">Some balances exceed their listed limits. Verify the amounts and account types.</div>':'');
 }
+
+function renderImpact(){
+const pay=Number(state.settings?.pay)||0;
+const activeCards=active();
+const min=activeCards.reduce((n,d)=>n+Number(d.min),0);
+const extra=Number(state.debtPrefs.extraMonthly)||0;
+const reserve=(min+extra)*12/52;
+if(!pay){el('debt-paycheck-impact').innerHTML='<div class="hint" style="margin-top:14px">Add your weekly take-home pay in Settings to see the average paycheck allocation for this plan.</div>';return}
+el('debt-paycheck-impact').innerHTML='<hr><div class="eyebrow">Weekly paycheck impact</div><div class="row"><div><div class="figure">'+money(reserve)+'</div><div class="hint">Average amount per paycheck to set aside for listed debt minimums plus your extra payment</div></div><div style="text-align:right"><strong>'+money(pay)+'</strong><div class="hint">Weekly take-home pay</div></div></div><div class="hint" style="margin-top:10px">This is an average (monthly amount × 12 ÷ 52), not an actual due-date allocation or a safe-to-spend balance. Your other bills and essentials still come first. Existing Bills entries may already include these minimums; do not deduct them twice.</div>'+(reserve>pay?'<div class="warn">The monthly debt scenario averages more than your entire weekly paycheck. Reduce the extra payment or revise the plan.</div>':'');
+}
+
 function addScore(){const date=el('score-date').value,score=numVal('score-number'),source=el('score-source').value.trim();if(!date||!Number.isInteger(score)||score<300||score>850||!source)return alert('Enter a date, score 300–850, and score model/source.');
 state.creditScores=state.creditScores.filter(x=>!(x.date===date&&x.source===source)).concat({date,score,source});if(persist()){el('score-number').value='';draw()}}
 function removeScoreAt(i){const x=state.creditScores.slice().sort((a,b)=>b.date.localeCompare(a.date))[i];if(x)removeScore(x.date,x.source)}
@@ -119,7 +130,7 @@ const list=state.debts,activeCards=active(),total=activeCards.reduce((n,x)=>n+Nu
 el('debt-kpis').innerHTML='<div class="card"><div class="eyebrow">Entered balances</div><div class="figure">'+money(total)+'</div></div><div class="card"><div class="eyebrow">Monthly minimums</div><div class="figure">'+money(min)+'</div></div><div class="card"><div class="eyebrow">Interest / month</div><div class="figure">'+money(interest)+'</div><div class="tiny muted">'+(unknown?'Partial: '+unknown+' APR unknown':'Approximate, before payments')+'</div></div><div class="card"><div class="eyebrow">Tracked accounts</div><div class="figure">'+list.length+'</div></div>';
 el('debt-list').innerHTML=list.length?list.map((x,i)=>'<div class="lineitem"><div class="row"><div><strong>'+safe(x.name)+'</strong><div class="small muted">'+money(x.balance)+' balance · '+(x.apr===null||x.apr===undefined||x.apr===''?'APR unknown':fmt(x.apr)+'% APR')+'</div><div class="hint">Minimum '+money(x.min)+'/mo'+(x.limit!==null&&x.limit!==undefined?' · Limit '+money(x.limit):'')+'</div></div><div style="display:flex;gap:6px"><button class="btn sm" onclick="openDebtAt('+i+')">Edit</button><button class="btn sm danger" onclick="removeDebtAt('+i+')">×</button></div></div></div>').join(''):'<div class="hint" style="padding:18px 0">No credit cards added yet. Add the balances, APRs, and minimum payments you want to track.</div>';
 if(refreshExtra)el('extra').value=state.debtPrefs.extraMonthly||0;
-renderPlans();renderUtil();renderScores();
+renderPlans();renderImpact();renderUtil();renderScores();
 }
 el('score-date').value=new Date().toISOString().slice(0,10);draw();
 </script>
