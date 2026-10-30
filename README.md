@@ -18,6 +18,7 @@ A simple iPhone-friendly, offline-capable paycheck and bill planning web app.
 - See approximate monthly interest and the average weekly paycheck allocation for the selected debt payment scenario.
 - Record credit score check-ins by report date and score model; the app cannot access your actual credit report or predict score increases.
 - Debt entries are stored only in local browser data and included in app backup exports. No private debt details are committed to this repository.
+- **Debt-only import:** use Debt → Import private debt list (.json). The file has `kind: "debt-snapshot"` and a `debts` array. The import adds only missing debt names and preserves existing budgets, bills, and recorded payments. Charged-off entries can be excluded from simulation. Never commit that private JSON to the public repo.
 - Debt minimums are **not** added to the separate Bills forecast automatically; check for overlapping entries to avoid double counting.
 - Projections assume constant APRs, monthly interest approximations, no new purchases or fees, and no changes to payment terms. Confirm actual charges with statements.
 
