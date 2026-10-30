@@ -23,7 +23,7 @@ dialog::backdrop{background:#000a}.actions{display:flex;gap:8px;justify-content:
 <div class="card hero"><h2>Plan with your real monthly budget</h2><div class="small muted">Compare payoff methods, see estimated interest, and track your credit habits. No card data is published to GitHub. This page does not connect to banks or credit bureaus directly.</div></div>
 <section class="kpis" id="debt-kpis" aria-live="polite"></section>
 <div class="card" style="margin-top:13px"><div class="row"><h2>My credit cards & debts</h2><button class="btn primary sm" onclick="openDebt()">+ Add card</button></div>
-<div class="hint">Enter each account's current balance, purchase APR, and monthly minimum from the latest statement. Use 0% only for a genuine 0% offer. For cash advances or multiple APRs, a single APR is only an approximation.</div><div id="debt-list"></div></div>
+<div class="hint">Enter each account's current balance, purchase APR, and monthly minimum from the latest statement. Use 0% only for a genuine 0% offer. For cash advances or multiple APRs, a single APR is only an approximation.</div><div class="actions" style="justify-content:flex-start"><button class="btn sm" onclick="el('debt-import').click()">Import private debt list (.json)</button><input id="debt-import" type="file" accept="application/json,.json" style="display:none" onchange="importDebtFile(event)"></div><div class="hint">Debt-only imports preserve your existing paycheck, bills, and expenses and skip matching debt names.</div><div id="debt-list"></div></div>
 <div class="card"><h2>Compare repayment strategies</h2>
 <label for="extra">Extra monthly payment beyond all listed minimums ($)</label><input id="extra" type="number" min="0" max="100000" step=".01" inputmode="decimal" placeholder="0" oninput="extraInput()">
 <div class="hint" style="margin-top:7px">Only enter money you can allocate after essentials and other bills. This amount is a scenario, not a recommendation. Paid-off minimums are rolled into remaining debts in both scenarios.</div>
@@ -47,7 +47,7 @@ dialog::backdrop{background:#000a}.actions{display:flex;gap:8px;justify-content:
 <label for="debt-name">Card or debt name</label><input id="debt-name" maxlength="90" required placeholder="e.g. Visa">
 <div class="split"><div><label for="debt-balance">Current balance ($)</label><input id="debt-balance" type="number" min="0" step=".01" required></div><div><label for="debt-apr">APR (%) — leave blank if unknown</label><input id="debt-apr" type="number" min="0" max="100" step=".01" placeholder="Unknown"></div></div>
 <div class="split"><div><label for="debt-min">Monthly minimum ($)</label><input id="debt-min" type="number" min="0" step=".01" required></div><div><label for="debt-limit">Credit limit ($), if any</label><input id="debt-limit" type="number" min="0" step=".01" placeholder="Optional"></div></div>
-<div class="hint">Use the purchase APR for one-rate estimates. Real interest often accrues daily. Check your statement for exact charges and any cash-advance APR.</div>
+<label for="debt-status">Account status</label><select id="debt-status"><option value="open">Open/current</option><option value="needs-review">Needs verification</option><option value="charged-off">Closed/charged off</option></select><label class="row" style="justify-content:flex-start;margin:12px 0"><input type="checkbox" id="debt-include" checked style="width:auto"> Include in repayment simulation and utilization</label><div class="hint">Charged-off debts default to excluded from normal payoff simulations until the status and amount are verified.</div><div class="hint">Use the purchase APR for one-rate estimates. Real interest often accrues daily. Check your statement for exact charges and any cash-advance APR.</div>
 <div class="actions"><button type="button" class="btn" onclick="document.getElementById('debt-modal').close()">Cancel</button><button class="btn primary" type="submit">Save account</button></div></form></dialog>
 <nav aria-label="Main navigation"><a href="./index.html"><b>⌂</b>Home</a><a href="./index.html" onclick="sessionStorage.setItem('mmm_next','bills')"><b>▤</b>Bills</a><a href="./index.html" onclick="sessionStorage.setItem('mmm_next','forecast')"><b>▥</b>Pay</a><a href="./debt.html" class="active"><b>◇</b>Debt</a><a href="./index.html" onclick="sessionStorage.setItem('mmm_next','settings')"><b>⚙</b>Settings</a></nav>
 <script>
@@ -64,17 +64,36 @@ const safe=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'
 const cents=n=>Math.round((Number(n)||0)*100)/100;
 const numVal=id=>{let v=el(id).value.trim();return v===''?null:Number(v)};
 function persist(){try{localStorage.setItem(KEY,JSON.stringify(state));return true}catch(e){alert('Could not save to this browser. Check storage permissions.');return false}}
-function active(){return state.debts.filter(d=>Number(d.balance)>0)}
+function active(){return state.debts.filter(d=>d.includeInPlan!==false&&Number(d.balance)>0)}
 function openDebtAt(i){const item=state.debts[i];if(item)openDebt(item.id)}
 function removeDebtAt(i){const item=state.debts[i];if(item)removeDebt(item.id)}
 function openDebt(id){const d=state.debts.find(x=>x.id===id);el('debt-modal-title').textContent=d?'Edit account':'Add account';el('debt-id').value=d?.id||'';
-for(const [k,p] of Object.entries({'debt-name':'name','debt-balance':'balance','debt-apr':'apr','debt-min':'min','debt-limit':'limit'})){el(k).value=d?.[p]??''}el('debt-modal').showModal()}
+for(const [k,p] of Object.entries({'debt-name':'name','debt-balance':'balance','debt-apr':'apr','debt-min':'min','debt-limit':'limit'})){el(k).value=d?.[p]??''}el('debt-status').value=d?.status||'open';el('debt-include').checked=d?.includeInPlan!==false;el('debt-modal').showModal()}
 function saveDebt(ev){ev.preventDefault();const name=el('debt-name').value.trim(),balance=numVal('debt-balance'),apr=numVal('debt-apr'),min=numVal('debt-min'),limit=numVal('debt-limit');
 if(!name||balance===null||!Number.isFinite(balance)||balance<0||min===null||!Number.isFinite(min)||min<0||(apr!==null&&(!Number.isFinite(apr)||apr<0||apr>100))||(limit!==null&&(!Number.isFinite(limit)||limit<0)))return alert('Enter valid amounts, a name, and an APR from 0 to 100% (or leave APR blank).');
 const id=el('debt-id').value||('d'+Date.now()+Math.random().toString(36).slice(2,6));
-const obj={id,name,balance:cents(balance),apr,min:cents(min),limit:limit===null?null:cents(limit)};
+const obj={...state.debts.find(x=>x.id===id),id,name,balance:cents(balance),apr,min:cents(min),limit:limit===null?null:cents(limit),status:el('debt-status').value,includeInPlan:el('debt-include').checked};
 state.debts=state.debts.filter(x=>x.id!==id).concat(obj);if(persist()){el('debt-modal').close();draw()}}
 function removeDebt(id){if(!confirm('Remove this debt from the payoff planner? This will not change your bill reminders.'))return;state.debts=state.debts.filter(x=>x.id!==id);if(persist())draw()}
+
+async function importDebtFile(ev){
+const f=ev.target.files?.[0];if(!f)return;
+try{
+ const o=JSON.parse(await f.text());
+ if(o.kind!=='debt-snapshot'||!Array.isArray(o.debts)||o.debts.length>200)throw Error('Not a supported debt-only import');
+ const seen=new Set(state.debts.map(d=>String(d.name).toLowerCase().replace(/[^a-z0-9]/g,'')));let added=0,skipped=0;
+ for(const x of o.debts){
+  const name=typeof x.name==='string'?x.name.trim():'',bal=Number(x.balance),min=Number(x.min);
+  const apr=x.apr===null||x.apr===''||x.apr===undefined?null:Number(x.apr);
+  const limit=x.limit===null||x.limit===''||x.limit===undefined?null:Number(x.limit);
+  const key=name.toLowerCase().replace(/[^a-z0-9]/g,'');
+  if(!key||seen.has(key)||!Number.isFinite(bal)||bal<0||!Number.isFinite(min)||min<0||(apr!==null&&(!Number.isFinite(apr)||apr<0||apr>100))||(limit!==null&&(!Number.isFinite(limit)||limit<0))){skipped++;continue}
+  state.debts.push({id:'di-'+Date.now()+'-'+added+'-'+Math.random().toString(36).slice(2,6),name:name.slice(0,90),balance:cents(bal),apr,min:cents(min),limit:limit===null?null:cents(limit),status:['open','needs-review','charged-off'].includes(x.status)?x.status:'needs-review',includeInPlan:x.includeInPlan===true,asOf:typeof x.asOf==='string'?x.asOf:'',note:typeof x.note==='string'?x.note.slice(0,600):''});seen.add(key);added++;
+ }
+ if(persist()){draw();alert('Added '+added+' debt records; skipped '+skipped+' existing/invalid entries. Check historical balances and minimums before using estimates.')}
+}catch(e){alert('Import failed: '+e.message)}finally{ev.target.value=''}
+}
+
 function extraInput(){let n=numVal('extra');if(n===null||!Number.isFinite(n)||n<0||n>100000)return;state.debtPrefs.extraMonthly=cents(n);if(persist())draw(false)}
 function monthInterest(d){return Number(d.balance)*(Number(d.apr)/1200)}
 function runPlan(method,extra){
@@ -126,9 +145,9 @@ function removeScoreAt(i){const x=state.creditScores.slice().sort((a,b)=>b.date.
 function removeScore(date,source){if(!confirm('Remove this score check-in?'))return;state.creditScores=state.creditScores.filter(x=>!(x.date===date&&x.source===source));if(persist())draw()}
 function renderScores(){const list=state.creditScores.slice().sort((a,b)=>b.date.localeCompare(a.date));el('score-history').innerHTML=!list.length?'<div class="hint" style="margin-top:12px">No score check-ins saved yet.</div>':list.slice(0,18).map((x,i)=>'<div class="lineitem row"><div><strong>'+safe(x.score)+'</strong> <span class="hint">'+safe(x.source)+'</span><div class="hint">'+safe(x.date)+'</div></div><button class="btn sm danger" onclick="removeScoreAt('+i+')">Delete</button></div>').join('')}
 function draw(refreshExtra=true){
-const list=state.debts,activeCards=active(),total=activeCards.reduce((n,x)=>n+Number(x.balance),0),min=activeCards.reduce((n,x)=>n+Number(x.min),0),known=activeCards.filter(x=>x.apr!==null&&x.apr!==undefined&&x.apr!==''&&Number.isFinite(Number(x.apr))),interest=known.reduce((n,x)=>n+monthInterest(x),0),unknown=activeCards.length-known.length;
+const list=state.debts,activeCards=active(),total=list.reduce((n,x)=>n+Number(x.balance),0),min=activeCards.reduce((n,x)=>n+Number(x.min),0),known=activeCards.filter(x=>x.apr!==null&&x.apr!==undefined&&x.apr!==''&&Number.isFinite(Number(x.apr))),interest=known.reduce((n,x)=>n+monthInterest(x),0),unknown=activeCards.length-known.length;
 el('debt-kpis').innerHTML='<div class="card"><div class="eyebrow">Entered balances</div><div class="figure">'+money(total)+'</div></div><div class="card"><div class="eyebrow">Monthly minimums</div><div class="figure">'+money(min)+'</div></div><div class="card"><div class="eyebrow">Interest / month</div><div class="figure">'+money(interest)+'</div><div class="tiny muted">'+(unknown?'Partial: '+unknown+' APR unknown':'Approximate, before payments')+'</div></div><div class="card"><div class="eyebrow">Tracked accounts</div><div class="figure">'+list.length+'</div></div>';
-el('debt-list').innerHTML=list.length?list.map((x,i)=>'<div class="lineitem"><div class="row"><div><strong>'+safe(x.name)+'</strong><div class="small muted">'+money(x.balance)+' balance · '+(x.apr===null||x.apr===undefined||x.apr===''?'APR unknown':fmt(x.apr)+'% APR')+'</div><div class="hint">Minimum '+money(x.min)+'/mo'+(x.limit!==null&&x.limit!==undefined?' · Limit '+money(x.limit):'')+'</div></div><div style="display:flex;gap:6px"><button class="btn sm" onclick="openDebtAt('+i+')">Edit</button><button class="btn sm danger" onclick="removeDebtAt('+i+')">×</button></div></div></div>').join(''):'<div class="hint" style="padding:18px 0">No credit cards added yet. Add the balances, APRs, and minimum payments you want to track.</div>';
+el('debt-list').innerHTML=list.length?list.map((x,i)=>'<div class="lineitem"><div class="row"><div><strong>'+safe(x.name)+'</strong><div class="small muted">'+money(x.balance)+' balance · '+(x.apr===null||x.apr===undefined||x.apr===''?'APR unknown':fmt(x.apr)+'% APR')+'</div><div class="hint">Minimum '+money(x.min)+'/mo'+(x.limit!==null&&x.limit!==undefined?' · Limit '+money(x.limit):'')+'</div><div class="hint">'+(x.includeInPlan===false?'Excluded from repayment projection':'Included in repayment projection')+(x.status==='charged-off'?' · Charged off':x.status==='needs-review'?' · Needs review':'')+(x.asOf?' · Source date '+safe(x.asOf):'')+'</div>'+(x.note?'<div class="hint">'+safe(x.note)+'</div>':'')+'</div><div style="display:flex;gap:6px"><button class="btn sm" onclick="openDebtAt('+i+')">Edit</button><button class="btn sm danger" onclick="removeDebtAt('+i+')">×</button></div></div></div>').join(''):'<div class="hint" style="padding:18px 0">No credit cards added yet. Add the balances, APRs, and minimum payments you want to track.</div>';
 if(refreshExtra)el('extra').value=state.debtPrefs.extraMonthly||0;
 renderPlans();renderImpact();renderUtil();renderScores();
 }
