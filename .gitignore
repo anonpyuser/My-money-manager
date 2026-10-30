@@ -1,0 +1,9 @@
+# Keep financial data out of GitHub
+*PRIVATE*.json
+*private*.json
+*backup*.json
+*starter-bills*.json
+*transactions*.csv
+*Personal_Preview*.html
+*.ofx
+*.qfx
