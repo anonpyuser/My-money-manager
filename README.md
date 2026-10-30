@@ -11,6 +11,16 @@ A simple iPhone-friendly, offline-capable paycheck and bill planning web app.
 - Local JSON backup and restore
 - Add to Home Screen on iPhone
 
+
+## Debt Payoff & Credit Health
+- Open the **Debt** tab or `debt.html` to enter card balances, APRs, credit limits, and minimum payments.
+- Compare debt avalanche (higher APR first) versus snowball (smaller balance first) with a user-entered extra monthly payment.
+- See approximate monthly interest and the average weekly paycheck allocation for the selected debt payment scenario.
+- Record credit score check-ins by report date and score model; the app cannot access your actual credit report or predict score increases.
+- Debt entries are stored only in local browser data and included in app backup exports. No private debt details are committed to this repository.
+- Debt minimums are **not** added to the separate Bills forecast automatically; check for overlapping entries to avoid double counting.
+- Projections assume constant APRs, monthly interest approximations, no new purchases or fees, and no changes to payment terms. Confirm actual charges with statements.
+
 ## Privacy
 The repository contains only the **blank app**. No linked bank information, statements, personally identifiable account data, or personal bill data is included. Your entries are stored in your browser's local storage, **not** synced to GitHub or to banking accounts. Back up your data regularly. Browser data may be lost if you clear website data or switch devices.
 
